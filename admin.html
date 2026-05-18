@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Admin — Bookings</title>
+  <style>
+    body{font-family: Arial, sans-serif; padding:20px}
+    table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #ddd;padding:8px}
+    th{background:#f4f4f4}
+    button{padding:6px 10px}
+  </style>
+</head>
+<body>
+  <h1>All Bookings</h1>
+  <p>You must be logged in as owner to view and resend notifications.</p>
+  <table id="bookings">
+    <thead>
+      <tr><th>ID</th><th>Equipment</th><th>Date</th><th>Time</th><th>Lab</th><th>Contact</th><th>Email</th><th>Phone</th><th>Actions</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    async function load(){
+      const res = await fetch('/api/bookings');
+      if(res.status===401){
+        document.body.insertAdjacentHTML('beforeend','<p style="color:red">Not authenticated as owner.</p>');
+        return;
+      }
+      const data = await res.json();
+      const tbody = document.querySelector('#bookings tbody');
+      tbody.innerHTML = '';
+      (data.bookings||[]).forEach(b=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${b.id}</td><td>${b.equipment}</td><td>${b.date}</td><td>${b.time}</td><td>${b.lab_name||b.labName||''}</td><td>${b.contact_name||b.contactName||''}</td><td>${b.email}</td><td>${b.phone}</td><td><button data-id="${b.id}">Resend Email</button></td>`;
+        tbody.appendChild(tr);
+      });
+      document.querySelectorAll('button[data-id]').forEach(btn=>{
+        btn.addEventListener('click', async e=>{
+          const id = btn.getAttribute('data-id');
+          btn.disabled = true;
+          const r = await fetch(`/api/bookings/${id}/email`, {method:'POST'});
+          if(r.ok) alert('Email sent'); else alert('Failed to send');
+          btn.disabled = false;
+        });
+      });
+    }
+    load();
+  </script>
+</body>
+</html>
