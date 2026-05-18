@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab Equipment Scheduler</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+  :root {
+    --bg: #f8f9fb;
+    --surface: #ffffff;
+    --surface2: #f1f3f7;
+    --border: rgba(0,0,0,0.09);
+    --border-mid: rgba(0,0,0,0.15);
+    --text: #111827;
+    --text-muted: #6b7280;
+    --text-dim: #9ca3af;
+    --accent: #2563eb;
+    --accent-bg: #eff6ff;
+    --accent-text: #1d4ed8;
+    --success: #059669;
+    --success-bg: #ecfdf5;
+    --success-text: #065f46;
+    --danger: #dc2626;
+    --danger-bg: #fef2f2;
+    --danger-text: #991b1b;
+    --warn: #d97706;
+    --warn-bg: #fffbeb;
+    --warn-text: #92400e;
+    --owner: #7c3aed;
+    --owner-bg: #f5f3ff;
+    --owner-text: #5b21b6;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); font-size:14px; line-height:1.5; }
+  button { font-family:inherit; cursor:pointer; border:1px solid var(--border-mid); background:var(--surface); color:var(--text); border-radius:8px; padding:7px 14px; font-size:13px; transition:all 0.15s; }
+  button:hover { background:var(--surface2); }
+  input, select { font-family:inherit; font-size:13px; border:1px solid var(--border-mid); border-radius:8px; padding:9px 11px; width:100%; outline:none; background:var(--surface); color:var(--text); transition:border-color 0.15s; }
+  input:focus, select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,0.1); }
+  input::placeholder { color:var(--text-dim); }
+
+  /* LAYOUT */
+  .page { max-width:1100px; margin:0 auto; padding:20px 16px; }
+  .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--border); }
+  .logo { display:flex; align-items:center; gap:10px; }
+  .logo-icon { width:36px; height:36px; background:var(--accent); border-radius:9px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:18px; }
+  .logo-name { font-size:16px; font-weight:700; letter-spacing:-0.3px; }
+  .logo-sub { font-size:11px; color:var(--text-muted); margin-top:1px; }
+  .header-btns { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+  /* BADGES */
+  .badge { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600; }
+  .badge-owner { background:var(--owner-bg); color:var(--owner-text); border:1px solid rgba(124,58,237,0.2); }
+  .badge-dot { width:6px; height:6px; border-radius:50%; background:currentColor; animation:blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1}50%{opacity:0.3} }
+
+  /* EQUIPMENT TABS */
+  .tabs { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; margin-bottom:16px; }
+  .tabs::-webkit-scrollbar { display:none; }
+  .tab { flex-shrink:0; padding:7px 14px; border-radius:999px; border:1px solid var(--border-mid); background:var(--surface); color:var(--text-muted); font-size:12.5px; font-weight:500; white-space:nowrap; transition:all 0.15s; }
+  .tab:hover { background:var(--surface2); color:var(--text); }
+  .tab.active { background:var(--accent-bg); border-color:rgba(37,99,235,0.3); color:var(--accent-text); font-weight:600; }
+
+  /* WEEK NAV */
+  .week-bar { display:flex; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:10px 14px; margin-bottom:12px; }
+  .week-label { font-size:13px; font-weight:600; }
+  .week-sub { font-size:11px; color:var(--accent); margin-top:1px; }
+  .nav-btn { width:30px; height:30px; border-radius:8px; border:1px solid var(--border-mid); display:flex; align-items:center; justify-content:center; font-size:15px; padding:0; }
+  .nav-btn:hover { background:var(--accent-bg); color:var(--accent); border-color:rgba(37,99,235,0.3); }
+
+  /* LEGEND */
+  .legend { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:12px; }
+  .leg { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted); }
+  .leg-dot { width:10px; height:10px; border-radius:3px; }
+
+  /* CALENDAR */
+  .cal-wrap { overflow:auto; border:1px solid var(--border); border-radius:var(--radius-lg); }
+  .cal-grid { display:grid; grid-template-columns:64px repeat(7,minmax(90px,1fr)); min-width:694px; }
+  .col-head { padding:8px 6px; text-align:center; background:var(--surface2); border-right:1px solid var(--border); border-bottom:1px solid var(--border); }
+  .col-head:last-child { border-right:none; }
+  .col-head.today-col { background:var(--accent-bg); }
+  .day-label { font-size:10px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:var(--text-muted); }
+  .day-num { font-size:18px; font-weight:600; line-height:1; margin-top:2px; }
+  .day-mon { font-size:9px; color:var(--text-muted); margin-top:1px; }
+  .today-col .day-label, .today-col .day-num, .today-col .day-mon { color:var(--accent-text); }
+
+  .time-lbl { display:flex; align-items:center; justify-content:flex-end; padding:0 8px; background:var(--surface2); border-right:1px solid var(--border); border-bottom:1px solid var(--border); font-size:10px; font-weight:500; color:var(--text-muted); font-family:monospace; white-space:nowrap; }
+  .slot-cell { padding:5px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:center; min-height:50px; }
+  .slot-cell:nth-child(8n) { border-right:none; }
+
+  .chip { width:100%; height:38px; border-radius:7px; border:none; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:600; letter-spacing:0.4px; cursor:default; gap:3px; }
+  .chip-avail { background:var(--success-bg); color:var(--success-text); cursor:pointer; border:1px solid rgba(5,150,105,0.2); }
+  .chip-avail:hover { background:#d1fae5; box-shadow:0 0 0 2px rgba(5,150,105,0.2); }
+  .chip-booked { background:var(--danger-bg); color:var(--danger-text); border:1px solid rgba(220,38,38,0.15); }
+  .chip-unavail { background:transparent; color:transparent; border:1px dashed var(--border); }
+  .chip-owner-off { background:transparent; color:var(--text-dim); border:1px dashed var(--border-mid); cursor:pointer; }
+  .chip-owner-off:hover { background:var(--success-bg); color:var(--success-text); border-color:rgba(5,150,105,0.3); border-style:solid; }
+  .chip-owner-on { background:var(--success-bg); color:var(--success-text); border:1px solid rgba(5,150,105,0.2); cursor:pointer; }
+  .chip-owner-on:hover { background:var(--danger-bg); color:var(--danger-text); border-color:rgba(220,38,38,0.2); }
+  .chip-past { background:transparent; color:transparent; border:1px solid transparent; }
+
+  /* OWNER HINT */
+  .owner-hint { display:flex; align-items:center; gap:7px; background:var(--owner-bg); border:1px solid rgba(124,58,237,0.2); border-radius:var(--radius); padding:9px 13px; margin-bottom:14px; font-size:12px; color:var(--owner-text); }
+
+  /* BOOKINGS PANEL */
+  .bkg-panel { margin-top:20px; border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; }
+  .bkg-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:var(--surface2); border-bottom:1px solid var(--border); }
+  .bkg-count { background:var(--accent-bg); color:var(--accent-text); padding:2px 9px; border-radius:999px; font-size:11px; font-weight:700; }
+  .bkg-row { display:flex; align-items:center; gap:12px; padding:11px 16px; border-bottom:1px solid var(--border); transition:background 0.1s; }
+  .bkg-row:last-child { border-bottom:none; }
+  .bkg-row:hover { background:var(--surface2); }
+  .bkg-eq { padding:3px 9px; border-radius:999px; font-size:10px; font-weight:700; background:var(--accent-bg); color:var(--accent-text); white-space:nowrap; text-align:center; flex-shrink:0; }
+  .bkg-dt { font-family:monospace; font-size:10px; color:var(--success); flex-shrink:0; line-height:1.6; }
+  .bkg-info { flex:1; min-width:0; }
+  .bkg-lab { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bkg-contact { font-size:11px; color:var(--text-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .btn-cancel { flex-shrink:0; background:var(--danger-bg); color:var(--danger-text); border:1px solid rgba(220,38,38,0.2); font-size:11px; padding:4px 10px; }
+  .btn-cancel:hover { background:#fee2e2; }
+
+  /* MODAL */
+  .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100; align-items:center; justify-content:center; padding:16px; }
+  .overlay.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px; width:100%; max-width:440px; animation:slideUp 0.2s ease; position:relative; max-height:90vh; overflow-y:auto; }
+  @keyframes slideUp { from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1} }
+  .modal-close { position:absolute; top:14px; right:14px; width:28px; height:28px; border-radius:50%; border:1px solid var(--border-mid); display:flex; align-items:center; justify-content:center; font-size:14px; padding:0; background:var(--surface2); }
+  .modal-close:hover { background:var(--danger-bg); color:var(--danger-text); border-color:rgba(220,38,38,0.3); }
+  .modal-title { font-size:16px; font-weight:700; margin-bottom:4px; }
+  .modal-sub { font-size:12px; color:var(--text-muted); margin-bottom:18px; }
+  .slot-info-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; background:var(--surface2); border-radius:var(--radius); padding:11px; margin-bottom:16px; }
+  .slot-info-box .si-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:3px; }
+  .slot-info-box .si-val { font-size:12px; font-weight:600; color:var(--accent-text); font-family:monospace; }
+  .form-group { margin-bottom:12px; }
+  .form-label { display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:5px; }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .form-actions { display:flex; gap:8px; margin-top:16px; }
+  .form-actions button { flex:1; padding:10px; }
+  .btn-primary { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+  .btn-primary:hover { background:#1d4ed8; border-color:#1d4ed8; }
+  .btn-success { background:var(--success); color:#fff; border-color:var(--success); font-weight:600; }
+  .btn-success:hover { background:#047857; }
+  .err-msg { color:var(--danger); font-size:12px; margin-top:6px; }
+
+  /* SUCCESS MODAL */
+  .success-icon { text-align:center; font-size:44px; margin-bottom:10px; }
+  .ref-box { background:var(--surface2); border-radius:var(--radius); padding:12px; margin:14px 0; }
+  .ref-id { font-family:monospace; font-size:14px; font-weight:700; color:var(--accent-text); }
+  .ref-detail { font-size:12px; color:var(--text-muted); margin-top:6px; line-height:1.7; }
+
+  /* TOAST */
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); padding:9px 18px; border-radius:999px; font-size:13px; font-weight:500; z-index:200; white-space:nowrap; border:1px solid; pointer-events:none; transition:opacity 0.3s; opacity:0; }
+  .toast.show { opacity:1; }
+  .toast-success { background:var(--success-bg); color:var(--success-text); border-color:rgba(5,150,105,0.3); }
+  .toast-warn { background:var(--warn-bg); color:var(--warn-text); border-color:rgba(217,119,6,0.3); }
+
+  /* FOOTER HINT */
+  .footer-hint { text-align:center; font-size:11px; color:var(--text-dim); margin-top:14px; }
+
+  /* NOTICE BANNER */
+  .notice-banner { background:#fff7ed; border:1px solid rgba(217,119,6,0.35); border-left:4px solid var(--warn); border-radius:var(--radius); padding:13px 16px; margin-bottom:16px; }
+  .notice-banner .nb-title { font-size:13px; font-weight:700; color:var(--warn-text); display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+  .notice-banner ul { padding-left:18px; margin:0; }
+  .notice-banner li { font-size:12px; color:var(--warn-text); line-height:1.9; }
+  .notice-banner .zeta-line { color:var(--danger-text); font-weight:600; }
+
+  /* OWNER DAY-BLOCK */
+  .day-block-btn { width:100%; padding:5px 4px; border-radius:7px; font-size:10px; font-weight:600; border:1px solid rgba(217,119,6,0.35); background:var(--warn-bg); color:var(--warn-text); cursor:pointer; margin-bottom:4px; }
+  .day-block-btn:hover { background:#fde68a; }
+  .day-blocked-label { text-align:center; font-size:10px; font-weight:700; color:var(--danger-text); background:var(--danger-bg); border-radius:7px; padding:3px 6px; border:1px solid rgba(220,38,38,0.2); margin-bottom:4px; }
+
+  @media(max-width:600px) {
+    .form-row { grid-template-columns:1fr; }
+    .logo-sub { display:none; }
+    .slot-info-grid { grid-template-columns:1fr 1fr; }
+    .slot-info-grid .slot-info-box:last-child { grid-column:1/-1; }
+  }
+</style>
+
+<div id="app-root">
+  <!-- Overlay / Modal -->
+  <div id="overlay" class="overlay" onclick="handleOverlayBg(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Page -->
+  <div class="page">
+    <div class="header">
+      <div class="logo">
+        <div class="logo-icon"><i class="ti ti-flask" aria-hidden="true"></i></div>
+        <div>
+          <div class="logo-name">LabBook</div>
+          <div class="logo-sub">Equipment Scheduling System</div>
+        </div>
+      </div>
+      <div class="header-btns" id="header-btns"></div>
+    </div>
+
+    <div id="owner-hint"></div>
+
+    <!-- Notice Banner -->
+    <div class="notice-banner">
+      <div class="nb-title"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Important Booking Rules & Notices</div>
+      <ul>
+        <li>Each lab may only have <strong>one designated person</strong> book per equipment per day.</li>
+        <li>Maximum <strong>5 samples per day</strong> per lab — no exceptions.</li>
+        <li class="zeta-line">⚠️ Zeta Potential analyser is currently <strong>OUT OF SERVICE</strong> — Zeta electrode blockage reported due to negligent use. Equipment under repair.</li>
+      </ul>
+    </div>
+
+    <!-- Equipment tabs -->
+    <div class="tabs" id="equip-tabs"></div>
+
+    <!-- Week nav -->
+    <div class="week-bar">
+      <button class="nav-btn" onclick="changeWeek(-1)" aria-label="Previous week"><i class="ti ti-chevron-left" aria-hidden="true"></i></button>
+      <div style="text-align:center">
+        <div class="week-label" id="week-label"></div>
+        <div class="week-sub" id="week-sub"></div>
+      </div>
+      <button class="nav-btn" onclick="changeWeek(1)" aria-label="Next week"><i class="ti ti-chevron-right" aria-hidden="true"></i></button>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:var(--success-bg);border:1px solid rgba(5,150,105,0.3);"></div>Available – click to book</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--danger-bg);border:1px solid rgba(220,38,38,0.2);"></div>Booked</div>
+      <div class="leg"><div class="leg-dot" style="border:1px dashed var(--border-mid);"></div>Unavailable</div>
+      <div id="owner-legend"></div>
+    </div>
+
+    <!-- Calendar -->
+    <div class="cal-wrap">
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+
+    <!-- Bookings panel -->
+    <div id="bkg-panel"></div>
+
+    <div class="footer-hint" id="footer-hint"></div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+const EQUIPMENT = ['UV','Centrifuge','HPLC'];
+const SLOTS = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30','14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00','18:30'];
+const DAYS_SHORT = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const OWNER_PASS = 'qsrfyji@123';
+
+const PATH_EQ_MAP = {
+  '/uv': 'UV',
+  '/hplc': 'HPLC',
+  '/centrifuge': 'Centrifuge',
+};
+
+let S = {
+  isOwner: false,
+  wk: 0,
+  eq: PATH_EQ_MAP[window.location.pathname.toLowerCase()] || 'UV',
+  slots: {},        // "YYYY-MM-DD|EQ" → { "HH:MM": "available"|"unavailable"|"booked" }
+  bookings: [],
+  blockedDays: {},  // "YYYY-MM-DD|EQ" → true  (whole day marked no-booking)
+  showBkgs: false,
+  loaded: false
+};
+
+/* Helpers */
+function weekDates(offset) {
+  const now = new Date();
+  const dow = now.getDay() || 7;
+  const mon = new Date(now);
+  mon.setDate(now.getDate() - dow + 1 + offset * 7);
+  mon.setHours(0,0,0,0);
+  return Array.from({length:7}, (_,i) => { const d = new Date(mon); d.setDate(mon.getDate()+i); return d; });
+}
+function ymd(d) { return d.toISOString().split('T')[0]; }
+function dsp(d) { return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}); }
+function fmt12(t) { const [h,m] = t.split(':').map(Number); return `${h%12||12}:${String(m).padStart(2,'0')} ${h<12?'AM':'PM'}`; }
+function isToday(d) { return d.toDateString() === new Date().toDateString(); }
+function isPast(d) { const t = new Date(); t.setHours(0,0,0,0); return d < t; }
+function getSlot(date,eq,time) {
+  const stored = S.slots[`${date}|${eq}`]?.[time];
+  if (stored) return stored;
+  // Future slots default to available; past handled by caller
+  const d = new Date(date); d.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
+  return d >= today ? 'available' : 'unavailable';
+}
+function setSlot(date,eq,time,val) { const k=`${date}|${eq}`; if(!S.slots[k])S.slots[k]={}; S.slots[k][time]=val; }
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
+
+/* Storage */
+async function save() {
+  try { await window.storage.set('lbs-slots', JSON.stringify(S.slots)); } catch(e){}
+  try { await window.storage.set('lbs-bkgs', JSON.stringify(S.bookings)); } catch(e){}
+  try { await window.storage.set('lbs-blocked', JSON.stringify(S.blockedDays)); } catch(e){}
+}
+async function load() {
+  try { const r = await window.storage.get('lbs-slots'); if(r) S.slots = JSON.parse(r.value); } catch(e){}
+  try { const r = await window.storage.get('lbs-bkgs'); if(r) S.bookings = JSON.parse(r.value); } catch(e){}
+  try { const r = await window.storage.get('lbs-blocked'); if(r) S.blockedDays = JSON.parse(r.value); } catch(e){}
+  S.loaded = true;
+  render();
+}
+
+/* Toast */
+let toastTmr;
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast toast-${type} show`;
+  clearTimeout(toastTmr);
+  toastTmr = setTimeout(() => el.className = 'toast', 2800);
+}
+
+/* Modal */
+function openModal(html) {
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('overlay').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+}
+window.handleOverlayBg = (e) => { if(e.target===e.currentTarget) closeModal(); };
+
+/* Owner login */
+window.showOwnerLogin = () => {
+  openModal(`
+    <button class="modal-close" onclick="closeModal()" aria-label="Close">✕</button>
+    <div style="text-align:center;margin-bottom:16px;">
+      <i class="ti ti-lock" style="font-size:36px;color:var(--text-muted);" aria-hidden="true"></i>
+      <div class="modal-title" style="margin-top:8px;">Owner access</div>
+      <div class="modal-sub">Enter password to manage slot availability</div>
+    </div>
+    <form onsubmit="doLogin(event)">
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input name="pass" type="password" placeholder="Enter password" autofocus>
+        <div class="err-msg" id="pass-err" style="display:none">Incorrect password. Please try again.</div>
+      </div>
+      <div class="form-actions">
+        <button type="button" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-primary">Login</button>
+      </div>
+    </form>
+  `);
+};
+
+window.doLogin = (e) => {
+  e.preventDefault();
+  const pass = e.target.pass.value;
+  if (pass === OWNER_PASS) {
+    S.isOwner = true;
+    closeModal();
+    render();
+    toast('Welcome, Lab Owner! 🔬');
+  } else {
+    document.getElementById('pass-err').style.display = 'block';
+  }
+};
+
+window.exitOwner = () => { S.isOwner = false; S.showBkgs = false; render(); };
+window.changeWeek = (d) => { S.wk += d; render(); };
+window.selectEq = (eq) => {
+  const pathMap = { 'UV': '/uv', 'Centrifuge': '/centrifuge', 'HPLC': '/hplc' };
+  window.location.href = pathMap[eq] || '/';
+};
+window.toggleBkgs = () => { S.showBkgs = !S.showBkgs; renderBookings(); };
+
+/* Owner slot toggle */
+window.ownerToggle = (date, eq, time) => {
+  const cur = getSlot(date, eq, time);
+  if (cur === 'booked') return;
+  // If currently available (open), close it; if unavailable, open it
+  setSlot(date, eq, time, cur === 'available' ? 'unavailable' : 'available');
+  save(); renderCal();
+};
+
+/* Owner whole-day block toggle */
+window.ownerToggleDay = (date, eq) => {
+  const key = `${date}|${eq}`;
+  if (S.blockedDays[key]) {
+    delete S.blockedDays[key];
+    toast('Day re-opened for booking ✅');
+  } else {
+    S.blockedDays[key] = true;
+    toast('Day marked: No Booking Available 🚫', 'warn');
+  }
+  save(); renderCal();
+};
+
+/* Open booking form */
+window.openBook = (date, eq, time) => {
+  const eqOptions = EQUIPMENT.map(e => `<option value="${e}"${e===eq?' selected':''}>${e}</option>`).join('');
+  openModal(`
+    <button class="modal-close" onclick="closeModal()" aria-label="Close">✕</button>
+    <div class="modal-title">Book equipment slot</div>
+    <div class="modal-sub">Fill in your details to confirm the reservation</div>
+    <div class="slot-info-grid">
+      <div class="slot-info-box" style="grid-column:1/-1;">
+        <div class="si-label" style="margin-bottom:5px;">Equipment</div>
+        <select id="book-eq-select" style="font-size:13px;font-weight:600;color:var(--accent-text);border-color:rgba(37,99,235,0.3);background:var(--accent-bg);">${eqOptions}</select>
+      </div>
+      <div class="slot-info-box"><div class="si-label">Date</div><div class="si-val">${date}</div></div>
+      <div class="slot-info-box"><div class="si-label">Time</div><div class="si-val">${fmt12(time)}</div></div>
+    </div>
+    <form onsubmit="doBook(event,'${date}',document.getElementById('book-eq-select').value,'${time}')">
+      <div class="form-group">
+        <label class="form-label">Lab / organization name *</label>
+        <input name="labName" placeholder="e.g. Nano Research Lab, IIT Mumbai" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Contact person *</label>
+          <input name="contactName" placeholder="Full name" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone number *</label>
+          <input name="phone" type="tel" placeholder="+91 XXXXX XXXXX" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email address *</label>
+        <input name="email" type="email" placeholder="you@institution.edu" required>
+      </div>
+      <div class="form-actions">
+        <button type="button" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-success">
+          <i class="ti ti-calendar-check" aria-hidden="true"></i> Confirm booking
+        </button>
+      </div>
+    </form>
+  `);
+};
+
+window.doBook = (e, date, eq, time) => {
+  e.preventDefault();
+  const f = e.target;
+  const bk = {
+    id: uid(), equipment: eq, date, time,
+    labName: f.labName.value.trim(),
+    contactName: f.contactName.value.trim(),
+    email: f.email.value.trim(),
+    phone: f.phone.value.trim(),
+    bookedAt: new Date().toISOString()
+  };
+  S.bookings.push(bk);
+  setSlot(date, eq, time, 'booked');
+  save();
+  renderCal();
+  openModal(`
+    <div class="success-icon">✅</div>
+    <div style="text-align:center;">
+      <div class="modal-title">Booking confirmed!</div>
+      <div class="modal-sub">Your slot has been successfully reserved</div>
+    </div>
+    <div class="ref-box">
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:4px;">Booking reference</div>
+      <div class="ref-id">#${bk.id.toUpperCase()}</div>
+      <div class="ref-detail">
+        <b>${bk.equipment}</b> · ${bk.date} · ${fmt12(bk.time)}<br>
+        ${bk.labName}<br>
+        ${bk.contactName} · ${bk.email} · ${bk.phone}
+      </div>
+    </div>
+    <button class="btn-primary" style="width:100%;padding:10px;" onclick="closeModal()">Done</button>
+  `);
+};
+
+window.cancelBk = (id) => {
+  if (!confirm('Cancel this booking?')) return;
+  const bk = S.bookings.find(b=>b.id===id);
+  if (bk) {
+    if (getSlot(bk.date, bk.equipment, bk.time) === 'booked') setSlot(bk.date, bk.equipment, bk.time, 'available');
+    S.bookings = S.bookings.filter(b=>b.id!==id);
+    save();
+    render();
+    toast('Booking cancelled', 'warn');
+  }
+};
+
+/* Render functions */
+function renderCal() {
+  const dates = weekDates(S.wk);
+  const grid = document.getElementById('cal-grid');
+
+  // Column headers
+  let html = `<div class="col-head" style="background:var(--surface2);"><span style="font-size:10px;color:var(--text-muted);">TIME</span></div>`;
+  dates.forEach((d,i) => {
+    const tc = isToday(d) ? ' today-col' : '';
+    const dateStr = ymd(d);
+    const dayKey = `${dateStr}|${S.eq}`;
+    const isBlocked = !!S.blockedDays[dayKey];
+    const past = isPast(d);
+
+    let blockBtn = '';
+    if (S.isOwner && !past) {
+      if (isBlocked) {
+        blockBtn = `<button class="day-block-btn" style="background:var(--danger-bg);color:var(--danger-text);border-color:rgba(220,38,38,0.3);" onclick="ownerToggleDay('${dateStr}','${S.eq.replace(/'/g,"\\'")}')">🔴 Unblock day</button>`;
+      } else {
+        blockBtn = `<button class="day-block-btn" onclick="ownerToggleDay('${dateStr}','${S.eq.replace(/'/g,"\\'")}')">🚫 Block day</button>`;
+      }
+    } else if (!S.isOwner && isBlocked && !past) {
+      blockBtn = `<div class="day-blocked-label">No Booking Available</div>`;
+    }
+
+    html += `<div class="col-head${tc}">
+      <div class="day-label">${DAYS_SHORT[i]}</div>
+      <div class="day-num">${d.getDate()}</div>
+      <div class="day-mon">${d.toLocaleDateString('en-IN',{month:'short'})}</div>
+      ${blockBtn}
+    </div>`;
+  });
+
+  // Slot rows
+  SLOTS.forEach(time => {
+    html += `<div class="time-lbl">${fmt12(time)}</div>`;
+    dates.forEach(d => {
+      const dateStr = ymd(d);
+      const dayKey = `${dateStr}|${S.eq}`;
+      const isBlocked = !!S.blockedDays[dayKey];
+      const past = isPast(d);
+      const status = past
+        ? (getSlot(dateStr, S.eq, time) === 'booked' ? 'booked' : 'past')
+        : getSlot(dateStr, S.eq, time);
+
+      let chip = '';
+      if (past) {
+        chip = status === 'booked'
+          ? `<div class="chip chip-booked"><i class="ti ti-lock" style="font-size:11px;"></i>Booked</div>`
+          : `<div class="chip chip-past"></div>`;
+      } else if (isBlocked && !S.isOwner) {
+        chip = `<div class="chip chip-unavail" title="No booking available today"></div>`;
+      } else if (S.isOwner) {
+        if (status === 'booked') {
+          chip = `<div class="chip chip-booked"><i class="ti ti-lock" style="font-size:11px;"></i>Booked</div>`;
+        } else if (status === 'available') {
+          chip = `<button class="chip chip-owner-on" onclick="ownerToggle('${dateStr}','${S.eq.replace(/'/g,"\\'")}','${time}')" title="Click to close slot"><i class="ti ti-check" style="font-size:11px;"></i>Open</button>`;
+        } else {
+          chip = `<button class="chip chip-owner-off" onclick="ownerToggle('${dateStr}','${S.eq.replace(/'/g,"\\'")}','${time}')" title="Click to open slot">—</button>`;
+        }
+      } else {
+        if (status === 'available') {
+          chip = `<button class="chip chip-avail" onclick="openBook('${dateStr}','${S.eq.replace(/'/g,"\\'")}','${time}')"><i class="ti ti-calendar-plus" style="font-size:12px;"></i>Book</button>`;
+        } else if (status === 'booked') {
+          chip = `<div class="chip chip-booked"><i class="ti ti-lock" style="font-size:11px;"></i>Booked</div>`;
+        } else {
+          chip = `<div class="chip chip-unavail"></div>`;
+        }
+      }
+      html += `<div class="slot-cell">${chip}</div>`;
+    });
+  });
+
+  grid.innerHTML = html;
+}
+
+function renderBookings() {
+  const panel = document.getElementById('bkg-panel');
+  if (!S.isOwner) { panel.innerHTML = ''; return; }
+  
+  const toggleTxt = S.showBkgs ? 'Hide bookings' : `View bookings (${S.bookings.length})`;
+  document.querySelectorAll('.bkg-toggle-btn').forEach(b => b.textContent = toggleTxt);
+  
+  if (!S.showBkgs) { panel.innerHTML = ''; return; }
+  
+  const sorted = [...S.bookings].sort((a,b) => a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+  panel.innerHTML = `
+    <div class="bkg-panel">
+      <div class="bkg-header">
+        <span style="font-weight:600;font-size:14px;">All bookings</span>
+        <span class="bkg-count">${S.bookings.length}</span>
+      </div>
+      <div>
+        ${sorted.length === 0
+          ? `<p style="padding:2rem;text-align:center;color:var(--text-muted);font-size:13px;">No bookings yet.</p>`
+          : sorted.map(b => `
+            <div class="bkg-row">
+              <div class="bkg-eq">${b.equipment}</div>
+              <div class="bkg-dt">${b.date}<br>${fmt12(b.time)}</div>
+              <div class="bkg-info">
+                <div class="bkg-lab">${b.labName}</div>
+                <div class="bkg-contact">${b.contactName} · ${b.email} · ${b.phone}</div>
+              </div>
+              <button class="btn-cancel" onclick="cancelBk('${b.id}')">Cancel</button>
+            </div>
+          `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function render() {
+  if (!S.loaded) return;
+  const dates = weekDates(S.wk);
+  
+  /* Header buttons */
+  const hbtns = document.getElementById('header-btns');
+  hbtns.innerHTML = S.isOwner ? `
+    <span class="badge badge-owner"><span class="badge-dot"></span>Owner mode</span>
+    <button class="bkg-toggle-btn" onclick="toggleBkgs()">${S.showBkgs ? 'Hide bookings' : `View bookings (${S.bookings.length})`}</button>
+    <button onclick="exitOwner()"><i class="ti ti-door-exit" aria-hidden="true"></i> Exit</button>
+  ` : `
+    <button onclick="showOwnerLogin()"><i class="ti ti-lock" aria-hidden="true"></i> Owner login</button>
+  `;
+  
+  /* Owner hint */
+  document.getElementById('owner-hint').innerHTML = S.isOwner ? `
+    <div class="owner-hint">
+      <i class="ti ti-edit" aria-hidden="true"></i>
+      Owner mode — all future slots are <strong>open by default</strong>. Click any green slot to <strong>close</strong> it, or a closed slot to reopen it. Use <strong>"Block day"</strong> on a column header to block the entire day.
+    </div>
+  ` : '';
+  
+  /* Owner legend */
+  document.getElementById('owner-legend').innerHTML = S.isOwner ? `
+    <div class="leg" style="color:var(--owner-text);"><i class="ti ti-click" style="font-size:12px;" aria-hidden="true"></i>Click slot to toggle</div>
+  ` : '';
+  
+  /* Equipment tabs */
+  document.getElementById('equip-tabs').innerHTML = EQUIPMENT.map(eq =>
+    `<button class="tab${eq===S.eq?' active':''}" onclick="selectEq('${eq}')">${eq}</button>`
+  ).join('');
+  
+  /* Week label */
+  document.getElementById('week-label').textContent = `${dsp(dates[0])} – ${dsp(dates[6])}`;
+  document.getElementById('week-sub').textContent = S.wk === 0 ? 'This week' : '';
+  
+  /* Footer hint */
+  document.getElementById('footer-hint').innerHTML = !S.isOwner
+    ? 'Click any green slot to book. Contact the lab owner if no slots are available.'
+    : '';
+  
+  renderCal();
+  renderBookings();
+}
+
+/* Boot */
+load();
+</script>
+</html>
