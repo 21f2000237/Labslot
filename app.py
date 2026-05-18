@@ -29,6 +29,9 @@ import sqlite3
 import hashlib
 import secrets
 import logging
+import smtplib
+import ssl
+from email.message import EmailMessage
 from datetime import date, timedelta, datetime
 from functools import wraps
 
@@ -52,7 +55,7 @@ OWNER_PASSWORD_HASH = hashlib.sha256(
     os.environ.get("OWNER_PASSWORD", "qsrfyji@123").encode()
 ).hexdigest()
 
-EQUIPMENT: list[str] = ["UV", "Centrifuge", "HPLC"]
+EQUIPMENT: list[str] = ["UV", "Centrifuge", "HPLC", "Particle Size", "Lyophilizer"]
 
 SLOTS: list[str] = [
     "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
@@ -234,6 +237,8 @@ def health():
 @app.get("/uv")
 @app.get("/hplc")
 @app.get("/centrifuge")
+@app.get("/particle-size")
+@app.get("/lyophilizer")
 def root():
     return send_from_directory(os.path.dirname(__file__), "lab-booking.html")
 
@@ -520,20 +525,26 @@ def create_booking():
     )
     db.commit()
 
+    booking_obj = {
+        "id": booking_id,
+        "equipment": equipment,
+        "date": date_str,
+        "time": time,
+        "labName": lab_name,
+        "contactName": contact_name,
+        "email": email,
+        "phone": phone,
+    }
+
     logger.info("Booking created: %s %s %s %s by %s", booking_id, equipment, date_str, time, lab_name)
+
+    # Attempt to send notification to admin (if configured)
+    notified = send_email_notification(booking_obj)
 
     return jsonify({
         "success": True,
-        "booking": {
-            "id": booking_id,
-            "equipment": equipment,
-            "date": date_str,
-            "time": time,
-            "labName": lab_name,
-            "contactName": contact_name,
-            "email": email,
-            "phone": phone,
-        },
+        "booking": booking_obj,
+        "notified": bool(notified),
     }), 201
 
 
@@ -561,6 +572,99 @@ def cancel_booking(booking_id: str):
 
     logger.info("Booking cancelled: %s", booking_id)
     return jsonify({"success": True, "cancelled_id": booking_id})
+
+
+# ── Email notifications ─────────────────────────────────────────────────────
+
+def send_email_notification(booking: dict) -> bool:
+    """Send a plain-text email notification about a booking to the configured ADMIN_EMAIL.
+    Environment variables:
+      - ADMIN_EMAIL: recipient for admin notifications (required to actually send)
+      - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+      - SMTP_FROM (optional)
+    Returns True on success, False otherwise.
+    """
+    admin = os.environ.get("ADMIN_EMAIL")
+    if not admin:
+        logger.info("ADMIN_EMAIL not set — skipping email notification.")
+        return False
+
+    smtp_host = os.environ.get("SMTP_HOST", "localhost")
+    smtp_port = int(os.environ.get("SMTP_PORT", "25"))
+    smtp_user = os.environ.get("SMTP_USER")
+    smtp_pass = os.environ.get("SMTP_PASS")
+    smtp_from = os.environ.get("SMTP_FROM") or (smtp_user if smtp_user else f"no-reply@{os.environ.get('HOSTNAME','localhost')}")
+
+    msg = EmailMessage()
+    msg["Subject"] = f"New booking: {booking['equipment']} {booking['date']} {booking['time']}"
+    msg["From"] = smtp_from
+    msg["To"] = admin
+
+    body = (
+        f"New booking received:\n"
+        f"ID: {booking['id']}\n"
+        f"Equipment: {booking['equipment']}\n"
+        f"Date: {booking['date']}\n"
+        f"Time: {booking['time']}\n"
+        f"Lab name: {booking.get('labName','')}\n"
+        f"Contact: {booking.get('contactName','')}\n"
+        f"Email: {booking.get('email','')}\n"
+        f"Phone: {booking.get('phone','')}\n"
+    )
+    msg.set_content(body)
+
+    try:
+        if smtp_port == 465:
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context) as s:
+                if smtp_user and smtp_pass:
+                    s.login(smtp_user, smtp_pass)
+                s.send_message(msg)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port) as s:
+                try:
+                    s.starttls(context=ssl.create_default_context())
+                except Exception:
+                    pass
+                if smtp_user and smtp_pass:
+                    s.login(smtp_user, smtp_pass)
+                s.send_message(msg)
+        logger.info("Email notification sent to %s", admin)
+        return True
+    except Exception as e:
+        logger.exception("Failed to send email notification: %s", e)
+        return False
+
+
+@app.post("/api/bookings/<booking_id>/email")
+@require_owner
+def resend_booking_email(booking_id: str):
+    db = get_db()
+    row = db.execute("SELECT * FROM bookings WHERE id=?", (booking_id,)).fetchone()
+    if not row:
+        return jsonify({"error": "Booking not found."}), 404
+
+    booking = {
+        "id": row["id"],
+        "equipment": row["equipment"],
+        "date": row["date"],
+        "time": row["time"],
+        "labName": row["lab_name"],
+        "contactName": row["contact_name"],
+        "email": row["email"],
+        "phone": row["phone"],
+    }
+
+    ok = send_email_notification(booking)
+    if ok:
+        return jsonify({"success": True})
+    return jsonify({"success": False, "error": "Failed to send email."}), 500
+
+
+@app.get("/admin/bookings")
+@require_owner
+def admin_bookings_page():
+    return send_from_directory(os.path.dirname(__file__), "admin-bookings.html")
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
