@@ -155,8 +155,8 @@ def _get_slot_status(db: sqlite3.Connection, date_str: str, equipment: str, time
     """
     Return the effective status of a slot:
       'booked'      — an active booking exists
-      'available'   — no override and date is today or future
-      'unavailable' — explicit override OR date is in the past
+      'unavailable' — no override (default closed) or date is in the past
+      'available'   — explicitly opened by owner
     """
     d = date.fromisoformat(date_str)
 
@@ -184,7 +184,7 @@ def _get_slot_status(db: sqlite3.Connection, date_str: str, equipment: str, time
     if override:
         return override["status"]
 
-    return "available"
+    return "unavailable"
 
 
 # ── Validation helpers ─────────────────────────────────────────────────────────
