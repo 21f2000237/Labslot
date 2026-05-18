@@ -606,6 +606,7 @@ function render() {
   hbtns.innerHTML = S.isOwner ? `
     <span class="badge badge-owner"><span class="badge-dot"></span>Owner mode</span>
     <button class="bkg-toggle-btn" onclick="toggleBkgs()">${S.showBkgs ? 'Hide bookings' : `View bookings (${S.bookings.length})`}</button>
+    <button onclick="window.location.href='/admin/bookings'"><i class="ti ti-layout-list" aria-hidden="true"></i> Admin</button>
     <button onclick="exitOwner()"><i class="ti ti-door-exit" aria-hidden="true"></i> Exit</button>
   ` : `
     <button onclick="showOwnerLogin()"><i class="ti ti-lock" aria-hidden="true"></i> Owner login</button>
