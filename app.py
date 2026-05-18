@@ -25,12 +25,16 @@ GET    /health                    Health-check
 import os
 import re
 import uuid
+import json
+import base64
 import sqlite3
 import hashlib
 import secrets
 import logging
 import smtplib
 import ssl
+import urllib.request
+import urllib.parse
 from email.message import EmailMessage
 from datetime import date, timedelta, datetime
 from functools import wraps
@@ -538,13 +542,18 @@ def create_booking():
 
     logger.info("Booking created: %s %s %s %s by %s", booking_id, equipment, date_str, time, lab_name)
 
-    # Attempt to send notification to admin (if configured)
-    notified = send_email_notification(booking_obj)
+    # Attempt to send notifications to admin (if configured)
+    email_sent = send_email_notification(booking_obj)
+    whatsapp_sent = send_whatsapp_notification(booking_obj)
 
     return jsonify({
         "success": True,
         "booking": booking_obj,
-        "notified": bool(notified),
+        "notified": bool(email_sent or whatsapp_sent),
+        "notifications": {
+            "email": email_sent,
+            "whatsapp": whatsapp_sent,
+        },
     }), 201
 
 
@@ -634,6 +643,76 @@ def send_email_notification(booking: dict) -> bool:
     except Exception as e:
         logger.exception("Failed to send email notification: %s", e)
         return False
+
+
+def send_whatsapp_notification(booking: dict) -> bool:
+    """Send a WhatsApp notification via Twilio or WhatsApp Cloud API."""
+    to_number = os.environ.get("WHATSAPP_TO")
+    from_number = os.environ.get("WHATSAPP_FROM")
+    if not to_number or not from_number:
+        logger.info("WHATSAPP_TO or WHATSAPP_FROM not set — skipping WhatsApp notification.")
+        return False
+
+    body = (
+        f"New booking received:\n"
+        f"ID: {booking['id']}\n"
+        f"Equipment: {booking['equipment']}\n"
+        f"Date: {booking['date']}\n"
+        f"Time: {booking['time']}\n"
+        f"Lab: {booking.get('labName','')}\n"
+        f"Contact: {booking.get('contactName','')}\n"
+        f"Email: {booking.get('email','')}\n"
+        f"Phone: {booking.get('phone','')}\n"
+    )
+
+    twilio_sid = os.environ.get("WHATSAPP_ACCOUNT_SID")
+    twilio_token = os.environ.get("WHATSAPP_AUTH_TOKEN")
+    api_url = os.environ.get("WHATSAPP_API_URL")
+    api_token = os.environ.get("WHATSAPP_API_TOKEN")
+
+    if twilio_sid and twilio_token:
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}/Messages.json"
+        data = urllib.parse.urlencode({
+            "From": f"whatsapp:{from_number}",
+            "To": f"whatsapp:{to_number}",
+            "Body": body,
+        }).encode("utf-8")
+        req = urllib.request.Request(url, data=data)
+        auth = f"{twilio_sid}:{twilio_token}"
+        req.add_header("Authorization", "Basic " + base64.b64encode(auth.encode()).decode())
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                if 200 <= resp.status < 300:
+                    logger.info("WhatsApp notification sent via Twilio to %s", to_number)
+                    return True
+                logger.warning("WhatsApp notification failed: %s", resp.read().decode())
+        except Exception as e:
+            logger.exception("Failed to send WhatsApp notification via Twilio: %s", e)
+        return False
+
+    if api_url and api_token:
+        payload = json.dumps({
+            "messaging_product": "whatsapp",
+            "to": to_number,
+            "type": "text",
+            "text": {"body": body},
+        }).encode("utf-8")
+        req = urllib.request.Request(api_url, data=payload)
+        req.add_header("Authorization", f"Bearer {api_token}")
+        req.add_header("Content-Type", "application/json")
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                if 200 <= resp.status < 300:
+                    logger.info("WhatsApp notification sent via Cloud API to %s", to_number)
+                    return True
+                logger.warning("WhatsApp notification failed: %s", resp.read().decode())
+        except Exception as e:
+            logger.exception("Failed to send WhatsApp notification via Cloud API: %s", e)
+        return False
+
+    logger.info("No WhatsApp provider configured. Set WHATSAPP_ACCOUNT_SID/WHATSAPP_AUTH_TOKEN or WHATSAPP_API_URL/WHATSAPP_API_TOKEN.")
+    return False
 
 
 @app.post("/api/bookings/<booking_id>/email")
