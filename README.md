@@ -9,15 +9,6 @@ A REST API backend for the Lab Equipment Scheduler (`lab-booking.html`).
 ```bash
 # 1. Install dependencies
 pip install flask
-
-# 2. (Optional) set environment variables
-export SECRET_KEY="your-secret-key"        # Flask session secret
-export OWNER_PASSWORD="qsrfyji@123"        # default password
-export DB_PATH="labbook.db"                # SQLite file path
-export PORT=5000
-export FLASK_DEBUG=true                    # enable debug mode
-
-# 3. Run
 python app.py
 ```
 
